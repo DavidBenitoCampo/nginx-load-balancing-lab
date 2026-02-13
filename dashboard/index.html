@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,7 +24,11 @@
             --radius: 12px;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -80,8 +85,15 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
         }
 
         .grid {
@@ -117,9 +129,17 @@
             border-radius: var(--radius) var(--radius) 0 0;
         }
 
-        .card.healthy::before { background: var(--accent-green); }
-        .card.dead::before { background: var(--accent-red); }
-        .card.unknown::before { background: var(--text-secondary); }
+        .card.healthy::before {
+            background: var(--accent-green);
+        }
+
+        .card.dead::before {
+            background: var(--accent-red);
+        }
+
+        .card.unknown::before {
+            background: var(--text-secondary);
+        }
 
         .card-header {
             display: flex;
@@ -290,7 +310,7 @@
         .bar-track {
             flex: 1;
             height: 28px;
-            background: rgba(255,255,255,0.03);
+            background: rgba(255, 255, 255, 0.03);
             border-radius: 6px;
             overflow: hidden;
             position: relative;
@@ -308,10 +328,21 @@
             min-width: 40px;
         }
 
-        .bar-colors:nth-child(1) .bar-fill { background: linear-gradient(90deg, var(--accent-blue), #6366f1); }
-        .bar-colors:nth-child(2) .bar-fill { background: linear-gradient(90deg, var(--accent-green), #10b981); }
-        .bar-colors:nth-child(3) .bar-fill { background: linear-gradient(90deg, var(--accent-amber), #f97316); }
-        .bar-colors:nth-child(4) .bar-fill { background: linear-gradient(90deg, var(--accent-purple), #ec4899); }
+        .bar-colors:nth-child(1) .bar-fill {
+            background: linear-gradient(90deg, var(--accent-blue), #6366f1);
+        }
+
+        .bar-colors:nth-child(2) .bar-fill {
+            background: linear-gradient(90deg, var(--accent-green), #10b981);
+        }
+
+        .bar-colors:nth-child(3) .bar-fill {
+            background: linear-gradient(90deg, var(--accent-amber), #f97316);
+        }
+
+        .bar-colors:nth-child(4) .bar-fill {
+            background: linear-gradient(90deg, var(--accent-purple), #ec4899);
+        }
 
         /* Nginx info */
         .nginx-info {
@@ -365,12 +396,22 @@
         }
 
         @media (max-width: 600px) {
-            body { padding: 12px; }
-            .grid { grid-template-columns: 1fr; }
-            .stats-row { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+            body {
+                padding: 12px;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-row {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+            }
         }
     </style>
 </head>
+
 <body>
     <header>
         <h1>⚡ Nginx Load Balancing Lab</h1>
@@ -404,10 +445,12 @@
     <div class="nginx-info">
         <h2>🔧 Nginx Status</h2>
         <div class="nginx-stats" id="nginx-stats">
-            <div class="nginx-stat"><span class="value" id="nx-active">-</span><span class="label">Active Connections</span></div>
+            <div class="nginx-stat"><span class="value" id="nx-active">-</span><span class="label">Active
+                    Connections</span></div>
             <div class="nginx-stat"><span class="value" id="nx-accepts">-</span><span class="label">Accepts</span></div>
             <div class="nginx-stat"><span class="value" id="nx-handled">-</span><span class="label">Handled</span></div>
-            <div class="nginx-stat"><span class="value" id="nx-requests">-</span><span class="label">Requests</span></div>
+            <div class="nginx-stat"><span class="value" id="nx-requests">-</span><span class="label">Requests</span>
+            </div>
             <div class="nginx-stat"><span class="value" id="nx-reading">-</span><span class="label">Reading</span></div>
             <div class="nginx-stat"><span class="value" id="nx-writing">-</span><span class="label">Writing</span></div>
             <div class="nginx-stat"><span class="value" id="nx-waiting">-</span><span class="label">Waiting</span></div>
@@ -552,19 +595,42 @@
         async function crashBackend(hostname) {
             if (!confirm(`Crash backend ${hostname}? It will be restarted by Docker.`)) return;
 
-            try {
-                // Send multiple crash attempts — nginx will route to different backends
-                // We can't target a specific one, so we try several times
-                for (let i = 0; i < 5; i++) {
-                    await fetch('/api/crash', { method: 'POST' }).catch(() => {});
+            // Find and disable the button, show progress
+            const btns = document.querySelectorAll('.btn-crash');
+            const entries = Object.values(backendsData);
+            const idx = entries.findIndex(b => b.hostname === hostname);
+            const btn = idx >= 0 ? btns[idx] : null;
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '⏳ Targeting...';
+            }
+
+            let crashed = false;
+            // Send requests until we hit the right backend (max 30 tries)
+            for (let i = 0; i < 30 && !crashed; i++) {
+                try {
+                    // Check which backend we'd reach
+                    const probe = await fetch(`/api/stats?_t=${Date.now()}_${i}`);
+                    if (!probe.ok) continue;
+                    const data = await probe.json();
+                    if (data.hostname === hostname) {
+                        // We reached the target — crash it
+                        await fetch('/api/crash', { method: 'POST' }).catch(() => { });
+                        crashed = true;
+                    }
+                } catch {
+                    // request failed, backend may have died
                 }
-                // Mark it immediately
-                if (backendsData[hostname]) {
-                    backendsData[hostname].status = 'dead';
-                    renderBackends();
-                }
-            } catch {
-                // Expected — the backend dies mid-request
+            }
+
+            if (backendsData[hostname]) {
+                backendsData[hostname].status = 'dead';
+            }
+            if (btn) {
+                btn.textContent = crashed ? '💀 Crashed!' : '⚠️ Could not reach target';
+                setTimeout(() => renderBackends(), 2000);
+            } else {
+                renderBackends();
             }
         }
 
@@ -600,4 +666,5 @@
         setInterval(poll, POLL_INTERVAL);
     </script>
 </body>
+
 </html>
