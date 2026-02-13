@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nginx Load Balancing Lab — Dashboard</title>
+    <style>
+        :root {
+            --bg-primary: #0f1117;
+            --bg-card: #1a1d27;
+            --bg-card-hover: #222633;
+            --border: #2a2e3d;
+            --text-primary: #e4e6eb;
+            --text-secondary: #8b8fa3;
+            --accent-green: #22c55e;
+            --accent-green-dim: rgba(34, 197, 94, 0.15);
+            --accent-red: #ef4444;
+            --accent-red-dim: rgba(239, 68, 68, 0.15);
+            --accent-blue: #3b82f6;
+            --accent-blue-dim: rgba(59, 130, 246, 0.15);
+            --accent-amber: #f59e0b;
+            --accent-purple: #a855f7;
+            --radius: 12px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+
+        .status-pill .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 16px;
+            max-width: 1100px;
+            margin: 0 auto 32px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            background: var(--bg-card-hover);
+            border-color: #3a3e4d;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+
+        .card.healthy::before { background: var(--accent-green); }
+        .card.dead::before { background: var(--accent-red); }
+        .card.unknown::before { background: var(--text-secondary); }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title .icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .healthy .card-title .icon {
+            background: var(--accent-green-dim);
+        }
+
+        .dead .card-title .icon {
+            background: var(--accent-red-dim);
+        }
+
+        .unknown .card-title .icon {
+            background: rgba(139, 143, 163, 0.15);
+        }
+
+        .card-title h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .card-title .hostname {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        .badge {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+
+        .healthy .badge {
+            background: var(--accent-green-dim);
+            color: var(--accent-green);
+        }
+
+        .dead .badge {
+            background: var(--accent-red-dim);
+            color: var(--accent-red);
+        }
+
+        .unknown .badge {
+            background: rgba(139, 143, 163, 0.15);
+            color: var(--text-secondary);
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 2px;
+        }
+
+        .btn-crash {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            background: var(--accent-red-dim);
+            color: var(--accent-red);
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-crash:hover {
+            background: rgba(239, 68, 68, 0.25);
+            border-color: var(--accent-red);
+        }
+
+        .btn-crash:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Distribution section */
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            max-width: 1100px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .distribution {
+            max-width: 1100px;
+            margin: 0 auto 32px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+
+        .distribution h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .bar-chart {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .bar-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .bar-label {
+            width: 120px;
+            font-size: 0.8rem;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+            text-align: right;
+        }
+
+        .bar-track {
+            flex: 1;
+            height: 28px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            padding-left: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            min-width: 40px;
+        }
+
+        .bar-colors:nth-child(1) .bar-fill { background: linear-gradient(90deg, var(--accent-blue), #6366f1); }
+        .bar-colors:nth-child(2) .bar-fill { background: linear-gradient(90deg, var(--accent-green), #10b981); }
+        .bar-colors:nth-child(3) .bar-fill { background: linear-gradient(90deg, var(--accent-amber), #f97316); }
+        .bar-colors:nth-child(4) .bar-fill { background: linear-gradient(90deg, var(--accent-purple), #ec4899); }
+
+        /* Nginx info */
+        .nginx-info {
+            max-width: 1100px;
+            margin: 0 auto 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+
+        .nginx-info h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .nginx-stats {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .nginx-stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .nginx-stat .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .nginx-stat .label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        footer {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            padding: 12px 0;
+        }
+
+        footer a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            .grid { grid-template-columns: 1fr; }
+            .stats-row { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>⚡ Nginx Load Balancing Lab</h1>
+        <p>Real-time backend monitoring &amp; failover testing</p>
+    </header>
+
+    <div class="status-bar">
+        <div class="status-pill">
+            <span class="dot"></span>
+            <span>Auto-refresh: <strong id="refresh-interval">2s</strong></span>
+        </div>
+        <div class="status-pill">
+            <span>Backends: <strong id="total-alive">-</strong>/<strong id="total-backends">-</strong></span>
+        </div>
+        <div class="status-pill">
+            <span>Total Requests: <strong id="total-requests">-</strong></span>
+        </div>
+    </div>
+
+    <div class="grid" id="backends-grid">
+        <!-- Cards rendered by JS -->
+    </div>
+
+    <div class="distribution">
+        <h2>📊 Request Distribution</h2>
+        <div class="bar-chart" id="distribution-chart">
+            <!-- Bars rendered by JS -->
+        </div>
+    </div>
+
+    <div class="nginx-info">
+        <h2>🔧 Nginx Status</h2>
+        <div class="nginx-stats" id="nginx-stats">
+            <div class="nginx-stat"><span class="value" id="nx-active">-</span><span class="label">Active Connections</span></div>
+            <div class="nginx-stat"><span class="value" id="nx-accepts">-</span><span class="label">Accepts</span></div>
+            <div class="nginx-stat"><span class="value" id="nx-handled">-</span><span class="label">Handled</span></div>
+            <div class="nginx-stat"><span class="value" id="nx-requests">-</span><span class="label">Requests</span></div>
+            <div class="nginx-stat"><span class="value" id="nx-reading">-</span><span class="label">Reading</span></div>
+            <div class="nginx-stat"><span class="value" id="nx-writing">-</span><span class="label">Writing</span></div>
+            <div class="nginx-stat"><span class="value" id="nx-waiting">-</span><span class="label">Waiting</span></div>
+        </div>
+    </div>
+
+    <footer>
+        Nginx Load Balancing Lab &middot; <a href="/nginx-status" target="_blank">Raw Nginx Status</a>
+    </footer>
+
+    <script>
+        const POLL_INTERVAL = 2000;
+        const BACKEND_COUNT = 10; // We probe up to 10 possible backends
+
+        let backendsData = {};
+
+        function formatUptime(seconds) {
+            if (seconds < 60) return `${seconds}s`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            return `${h}h ${m}m`;
+        }
+
+        async function probeBackends() {
+            // Use the /stats endpoint through nginx — each request may hit a different backend
+            // We send multiple requests to discover all backends
+            const promises = [];
+            for (let i = 0; i < BACKEND_COUNT; i++) {
+                promises.push(
+                    fetch(`/api/stats?probe=${i}&_t=${Date.now()}`)
+                        .then(r => r.ok ? r.json() : null)
+                        .catch(() => null)
+                );
+            }
+
+            const results = await Promise.all(promises);
+            const seen = {};
+
+            results.forEach(r => {
+                if (r && r.hostname) {
+                    seen[r.hostname] = {
+                        server: r.server,
+                        hostname: r.hostname,
+                        uptime: r.uptime,
+                        requests: r.requests,
+                        memory: r.memory,
+                        status: 'healthy',
+                        lastSeen: Date.now()
+                    };
+                }
+            });
+
+            // Mark backends not seen in this round
+            for (const [key, data] of Object.entries(backendsData)) {
+                if (!seen[key]) {
+                    // Keep in list but mark as dead after a few misses
+                    if (Date.now() - data.lastSeen > 10000) {
+                        data.status = 'dead';
+                    }
+                }
+            }
+
+            // Merge new data
+            for (const [key, data] of Object.entries(seen)) {
+                backendsData[key] = data;
+            }
+
+            renderBackends();
+        }
+
+        function renderBackends() {
+            const grid = document.getElementById('backends-grid');
+            const entries = Object.values(backendsData);
+
+            // Update status bar
+            const alive = entries.filter(b => b.status === 'healthy').length;
+            document.getElementById('total-alive').textContent = alive;
+            document.getElementById('total-backends').textContent = entries.length;
+            const totalReq = entries.reduce((sum, b) => sum + (b.requests || 0), 0);
+            document.getElementById('total-requests').textContent = totalReq.toLocaleString();
+
+            if (entries.length === 0) {
+                grid.innerHTML = '<p style="color: var(--text-secondary); text-align: center; grid-column: 1/-1;">Discovering backends...</p>';
+                return;
+            }
+
+            grid.innerHTML = entries.map((b, i) => `
+                <div class="card ${b.status}">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="icon">${b.status === 'healthy' ? '🟢' : '🔴'}</div>
+                            <div>
+                                <h3>Backend ${i + 1}</h3>
+                                <div class="hostname">${b.hostname}</div>
+                            </div>
+                        </div>
+                        <span class="badge">${b.status}</span>
+                    </div>
+                    <div class="stats-row">
+                        <div class="stat">
+                            <div class="stat-value">${b.requests != null ? b.requests.toLocaleString() : '-'}</div>
+                            <div class="stat-label">Requests</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${b.uptime != null ? formatUptime(b.uptime) : '-'}</div>
+                            <div class="stat-label">Uptime</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${b.memory != null ? b.memory + 'MB' : '-'}</div>
+                            <div class="stat-label">Memory</div>
+                        </div>
+                    </div>
+                    <button class="btn-crash" onclick="crashBackend('${b.hostname}')" ${b.status !== 'healthy' ? 'disabled' : ''}>
+                        💥 Crash This Backend
+                    </button>
+                </div>
+            `).join('');
+
+            renderDistribution(entries);
+        }
+
+        function renderDistribution(entries) {
+            const chart = document.getElementById('distribution-chart');
+            const maxReq = Math.max(...entries.map(b => b.requests || 0), 1);
+
+            chart.innerHTML = entries.map((b, i) => {
+                const pct = Math.round(((b.requests || 0) / maxReq) * 100);
+                return `
+                    <div class="bar-row bar-colors">
+                        <span class="bar-label">${b.hostname.substring(0, 12)}</span>
+                        <div class="bar-track">
+                            <div class="bar-fill" style="width: ${Math.max(pct, 3)}%">
+                                ${b.requests || 0}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function crashBackend(hostname) {
+            if (!confirm(`Crash backend ${hostname}? It will be restarted by Docker.`)) return;
+
+            try {
+                // Send multiple crash attempts — nginx will route to different backends
+                // We can't target a specific one, so we try several times
+                for (let i = 0; i < 5; i++) {
+                    await fetch('/api/crash', { method: 'POST' }).catch(() => {});
+                }
+                // Mark it immediately
+                if (backendsData[hostname]) {
+                    backendsData[hostname].status = 'dead';
+                    renderBackends();
+                }
+            } catch {
+                // Expected — the backend dies mid-request
+            }
+        }
+
+        async function fetchNginxStatus() {
+            try {
+                const res = await fetch('/nginx-status');
+                const text = await res.text();
+
+                const activeMatch = text.match(/Active connections:\s*(\d+)/);
+                const serverMatch = text.match(/\s+(\d+)\s+(\d+)\s+(\d+)/);
+                const rwwMatch = text.match(/Reading:\s*(\d+)\s+Writing:\s*(\d+)\s+Waiting:\s*(\d+)/);
+
+                if (activeMatch) document.getElementById('nx-active').textContent = activeMatch[1];
+                if (serverMatch) {
+                    document.getElementById('nx-accepts').textContent = Number(serverMatch[1]).toLocaleString();
+                    document.getElementById('nx-handled').textContent = Number(serverMatch[2]).toLocaleString();
+                    document.getElementById('nx-requests').textContent = Number(serverMatch[3]).toLocaleString();
+                }
+                if (rwwMatch) {
+                    document.getElementById('nx-reading').textContent = rwwMatch[1];
+                    document.getElementById('nx-writing').textContent = rwwMatch[2];
+                    document.getElementById('nx-waiting').textContent = rwwMatch[3];
+                }
+            } catch { /* ignore */ }
+        }
+
+        async function poll() {
+            await Promise.all([probeBackends(), fetchNginxStatus()]);
+        }
+
+        // Initial load
+        poll();
+        setInterval(poll, POLL_INTERVAL);
+    </script>
+</body>
+</html>
