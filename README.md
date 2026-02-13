@@ -4,27 +4,22 @@ A hands-on lab to learn and experiment with Nginx load balancing strategies, fai
 
 ## Architecture
 
-```
-                    ┌─────────────────────────┐
-                    │      Client / Browser   │
-                    └────────┬───────┬────────┘
-                             │       │
-                         :80 │       │ :443
-                             ▼       ▼
-                    ┌─────────────────────────┐
-                    │     Nginx Reverse Proxy  │
-                    │  ┌───────────────────┐  │
-                    │  │  Load Balancer     │  │
-                    │  │  Rate Limiter      │  │
-                    │  │  Proxy Cache       │  │
-                    │  │  TLS Termination   │  │
-                    │  └───────────────────┘  │
-                    └────┬──────┬──────┬──────┘
-                         │      │      │
-                    ┌────┴─┐ ┌─┴────┐ ┌┴─────┐
-                    │ BE 1 │ │ BE 2 │ │ BE 3 │
-                    │:3000 │ │:3000 │ │:3000 │
-                    └──────┘ └──────┘ └──────┘
+```mermaid
+graph TD
+    Client["Client / Browser"]
+    Client -->|":80"| Nginx
+    Client -->|":443"| Nginx
+
+    subgraph Nginx["Nginx Reverse Proxy"]
+        LB["Load Balancer"]
+        RL["Rate Limiter"]
+        PC["Proxy Cache"]
+        TLS["TLS Termination"]
+    end
+
+    Nginx --> BE1["Backend 1 :3000"]
+    Nginx --> BE2["Backend 2 :3000"]
+    Nginx --> BE3["Backend 3 :3000"]
 ```
 
 ## Quick Start
