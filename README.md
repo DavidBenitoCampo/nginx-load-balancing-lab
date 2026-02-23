@@ -1,6 +1,6 @@
 # 🔄 Nginx Load Balancing Lab
 
-A hands-on lab to learn and experiment with Nginx load balancing strategies, failover, caching, and HTTPS/TLS — all running in Docker containers.
+A hands-on lab to experiment with Nginx load balancing strategies, failover, caching, and HTTPS/TLS — all running in Docker containers.
 
 ## Architecture
 
